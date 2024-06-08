@@ -1,34 +1,47 @@
 
+
 import pandas as pd
 
 #Publisher Dataset 
 df_feeds = pd.read_csv('train_data_feeds.csv').dropna() #no harm in dropping na's 
 
-#Advertisers 
+#Advertisers Dataset 
 df_ads = pd.read_csv('train_data_ads.csv').dropna()
 
 
-#%% Task 1 Age Group Distribution
-import matplotlib.pyplot as plt
+# Function to optimize data types
+def optimize_types(df):
+    for col in df.select_dtypes(include=['int']).columns:
+        df[col] = pd.to_numeric(df[col], downcast='integer')
+    for col in df.select_dtypes(include=['float']).columns:
+        df[col] = pd.to_numeric(df[col], downcast='float')
+    return df
 
-#Age 
-ages_counts=df_ads['age'].value_counts()
-#There are 8 unique values for age 
+# Optimizing and loading dataset in chunks
+def load_and_optimize_csv(file_path, chunk_size=1000):
+    chunks = []
+    for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+        chunk = chunk.dropna()  # Drop NA in chunks
+        chunk = optimize_types(chunk)
+        chunks.append(chunk)
+    df = pd.concat(chunks, ignore_index=True)
+    return df
 
-plt.figure(figsize=(10,6))
-plt.barplot(x=ages_counts.index,y=ages_counts.values)
-plt.xlabel('Unique Value of Ages')
-plt.ylabel('Number of Users')
-plt.title('Distribution of Ages')
-plt.grid(True,linestyle='--',alpha=0.6)
-for i,v in enumerate(ages_counts.values):
-    plt.text(i,v+1,str(v),ha='center')
-plt.show()
-#%%Code for Age Group Distribution if we are trying to take it from the people who we know are "engaging" 
+# Load and optimize datasets
+df_feeds = load_and_optimize_csv('train_data_feeds.csv')
+df_ads = load_and_optimize_csv('train_data_ads.csv')
+
+# Print shapes
+print(f"Final DataFrame Of The Publisher Dataset shape: {df_feeds.shape}")
+print(f"Final DataFrame Of The Advertiser Dataset shape: {df_ads.shape}")
+
+
+
+#%%Code for Age Group Distribution 
 import matplotlib.pyplot as plt
 
 def plot_age_distribution(df_ads, df_feeds):
-    # Identify common IDs between both datasets
+    #Common IDs between both datasets
     ads_ids = set(df_ads['user_id'].unique())
     feeds_ids = set(df_feeds['u_userId'].unique())
     common_ids = ads_ids.intersection(feeds_ids)
@@ -36,18 +49,22 @@ def plot_age_distribution(df_ads, df_feeds):
     # Filter ads dataset to include only common IDs
     ads_with_common_ids = df_ads[df_ads['user_id'].isin(common_ids)]
     
-    # Get the age distribution
-    ages_counts = ads_with_common_ids['age'].value_counts()
+    # Get the age distribution and sort by age
+    ages_counts = ads_with_common_ids['age'].value_counts().sort_index()
     
-    # Plot the distribution
+    # Plot distribution
     plt.figure(figsize=(10, 6))
-    plt.bar(ages_counts.index, ages_counts.values)
+    plt.bar(ages_counts.index, ages_counts.values, color='skyblue')
     plt.xlabel('Unique Value of Ages')
     plt.ylabel('Number of Users')
     plt.title('Distribution of Ages Among Users Who Click on Ads')
     plt.grid(True, linestyle='--', alpha=0.6)
-    for i, v in enumerate(ages_counts.values):
-        plt.text(i, v + 1, str(v), ha='center')
+    plt.xticks(ages_counts.index)  # Ensure x-axis labels are aligned correctly
+    
+    # Add text annotations
+    for age, count in zip(ages_counts.index, ages_counts.values):
+        plt.text(age, count + 0.5, str(count), ha='center', va='bottom', fontsize=8)
+    
     plt.show()
 
 # Example usage
@@ -55,43 +72,85 @@ def plot_age_distribution(df_ads, df_feeds):
 plot_age_distribution(df_ads, df_feeds)
 
 #%%Geographic Distribution
-city_counts=df_ads['city'].value_counts()
-#There are 341 unique values for city 
 
-plt.figure(figsize=(14,8))
-plt.barplot(x=city_counts.index,y=city_counts.values) #Could use sns.barplot also?
-plt.xlabel('Unique Value of Cities')
-plt.ylabel('Number of Users')
-plt.title('Distribution of Cities')
-plt.grid(True,linestyle='--',alpha=0.6)
-for i,v in enumerate(city_counts.values):
-    plt.text(i,v+1,str(v),ha='center')
 
-plt.show()
+def plot_city_distribution(df_ads, df_feeds):
+    # Common IDs between both datasets
+    common_ids = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
+    
+    # Filter ads dataset to include only common IDs
+    ads_with_common_ids = df_ads[df_ads['user_id'].isin(common_ids)]
+    
+    # Get the city distribution and sort by frequency
+    cities_counts = ads_with_common_ids['city'].value_counts().sort_values(ascending=False)
+    
+    # Top 10 since there are too many cities 
+    top_n = 10
+    top_cities = cities_counts.head(top_n)
+    
+    # Plot distribution
+    plt.figure(figsize=(12, 6))
+    bars = plt.bar(top_cities.index, top_cities.values, color='skyblue')
+    plt.xlabel('City Value')
+    plt.ylabel('Number of Users')
+    plt.title(f'Top {top_n} Cities Among Users Who Click on Ads')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.xticks(rotation=45, ha='right')  
+    
+    # Add text annotations with city names and counts
+    for bar, (city, count) in zip(bars, top_cities.items()):
+        plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5, f"{city}\n({count})", ha='center', va='bottom', fontsize=8)
+    
+    plt.tight_layout()  
+    plt.show()
+
+
+plot_city_distribution(df_ads, df_feeds)
 
 #%%Distribution of Devices that are being used 
-device_counts=df_ads['device_name'].value_counts()
-#There are 256 unique values for device name 
 
+def plot_devices_distribution(df_ads, df_feeds):
+    # Common IDs between both datasets
+    common_ids = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
+    
+    # Filter ads dataset to include only common IDs
+    ads_with_common_ids = df_ads[df_ads['user_id'].isin(common_ids)]
+    
+    # Get the device distribution and sort by frequency
+    devices_counts = ads_with_common_ids['device_size'].value_counts().sort_values(ascending=False)
+    
+    top_n = 10
+    top_devices = devices_counts.head(top_n)
+    
+    # Plot distribution
+    plt.figure(figsize=(15, 8))
+    bars = plt.bar(top_devices.index, top_devices.values, color='skyblue')
+    plt.xlabel('Device Size')
+    plt.ylabel('Number of Users')
+    plt.title(f'Top {top_n} Devices Sizes Among Users Who Click on Ads')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
+    
 
-plt.figure(figsize=(10,6))
-plt.barplot(x=ages_counts.index,y=ages_counts.values)
-plt.xlabel('Unique Value of Devices')
-plt.ylabel('Number of Users')
-plt.title('Distribution of Devices')
-plt.grid(True,linestyle='--',alpha=0.6)
-for i,v in enumerate(device_counts.values):
-    plt.text(i,v+1,str(v),ha='center')
-plt.show()
+    for bar, (device_size, count) in zip(bars, top_devices.items()):
+        plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5, f"{device_size}\n({count})", ha='center', va='bottom', fontsize=8)
+    
+    plt.tight_layout()  
+    plt.show()
+
+plot_devices_distribution(df_ads, df_feeds)
+
 
 #%%Engagement Patterns
 import seaborn as sns
 
-# Check if 'pt_d' contains date information
-print(df_ads['pt_d'].head())
-
-# Assuming 'pt_d' is a string column representing dates in the format 'YYYYMMDD'
-df_ads['timestamp'] = pd.to_datetime(df_ads['pt_d'], format='%Y%m%d')
+common_ids = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
+    
+# Filter ads dataset to include only common IDs
+ads_with_common_ids = df_ads[df_ads['user_id'].isin(common_ids)]
+  
+# 'pt_d' is a string column representing dates in the format 'YYYYMMDDHHMM'
+df_ads['timestamp'] = pd.to_datetime(ads_with_common_ids['pt_d'], format='%Y%m%d%H%M')
 
 # Extract hour and day of the week from the timestamp
 df_ads['hour'] = df_ads['timestamp'].dt.hour
@@ -123,51 +182,73 @@ plt.grid(True, linestyle='--', alpha=0.6)
 for i, v in enumerate(daily_clicks.values):
     plt.text(i, v + 1, str(v), ha='center')
 plt.show()
-
 #%% Content Preferences
+import seaborn as sns
 
-#Could print some of the first few rows to understand structure of the data
-#print(df_ads.head())
-#print(df_ads['i_cat'].nunique(), "unique content categories")
+# If is probability not necessary; Used it because something wasn't working before 
+if 'u_newsCatInterestsST' in df_feeds.columns and 'u_newsCatInterests' in df_feeds.columns:
+    # Find common IDs between both datasets
+    common_ids = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
 
-# Group by content category and count the number of clicks
-content_clicks = df_ads[df_ads['label'] == 1].groupby('i_cat').size().reset_index(name='click_count')
-#We know i_cat has 208 unique values 
+    # Filter ads dataset to include only common IDs
+    ads_with_common_ids = df_ads[df_ads['user_id'].isin(common_ids)]
 
-# Sort by click count for better visualization
-content_clicks = content_clicks.sort_values(by='click_count', ascending=False)
+    # Combine
+    combined_interests = df_feeds['u_newsCatInterestsST'].dropna() + '^' + df_feeds['u_newsCatInterests'].dropna()
 
+    # Split the combined strings, then flatten the list
+    combined_interests = combined_interests.str.strip('^')
+    all_interests = combined_interests.str.split('^').explode()
 
-#Visualizing all the categories 
-plt.figure(figsize=(16,8))
-sns.barplot(x='i_cat', y='click_count', data=content_clicks, palette='viridis')
-plt.xlabel('Content Category')
-plt.ylabel('Number of Clicks')
-plt.title('Ad Clicks by Content Category')
-plt.xticks(rotation=90, fontsize=8)  # Rotate and adjust font size for better readability
-plt.grid(True, linestyle='--', alpha=0.6)
-plt.show()
+    # Count the frequency of each unique value
+    category_counts = all_interests.value_counts().sort_values(ascending=False)
 
-# Visualize the top 20 categories since all of them could be overwhelmning and not so beneficial 
-top_n = 20
-top_content_clicks = content_clicks.head(top_n)
+    # Get the top 10 categories since there are too many values 
+    top10 = category_counts.head(10)
 
-plt.figure(figsize=(14,8))
-sns.barplot(x='i_cat', y='click_count', data=top_content_clicks, palette='viridis')
-plt.xlabel('Content Category')
-plt.ylabel('Number of Clicks')
-plt.title('Top 20 Ad Clicks by Content Category')
-plt.xticks(rotation=45, fontsize=10)  # Rotate and adjust font size for better readability
-plt.grid(True, linestyle='--', alpha=0.6)
-for i, v in enumerate(top_content_clicks['click_count']):
-    plt.text(i, v + 1, str(v), ha='center')
-plt.show()
+    # Plot the distribution
+    plt.figure(figsize=(12, 6)) 
+    sns.barplot(x=top10.index, y=top10.values, palette='viridis')
+    plt.xlabel('Category')
+    plt.ylabel('Count')
+    plt.title('Distribution of Top 10 News Category Interests')
+    plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
+    plt.grid(True, linestyle='--', alpha=0.6)
+
+    # Add text annotations
+    for i, v in enumerate(top10.values):
+        plt.text(i, v + 0.5, str(v), ha='center')
+
+    plt.tight_layout(pad=2.0)  
+    plt.show()
+else:
+    print("There's an Error, GG")
+
 
 #%% Task 2 Identifying Potential Customers 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from scipy.stats import chi2_contingency
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier 
 
+categorical_columns=['gender', 'residence', 'city', 'city_rank', 'series_dev', 
+                       'series_group', 'emui_dev', 'device_name', 'device_size', 
+                       'net_type', 'task_id', 'adv_id', 'creat_type_cd', 
+                       'adv_prim_id', 'inter_type_cd', 'slot_id', 'site_id', 
+                       'spread_app_id', 'hispace_app_tags', 'app_second_class']
 
+for col in categorical_columns:
+    le=LabelEncoder()
+    df_ads[col]=le.fit_transform(df_ads[col])
 
+X = df_ads.drop(columns=['name of the thing'])
+y = df_ads['name of the thing']
 
+# Perform stratified splitting
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.4, stratify=y, random_state=42)
+X_val, X_holdout, y_val, y_holdout = train_test_split(X_temp, y_temp, test_size=0.5, stratify=y_temp, random_state=42)
 
+PCmodel = RandomForestClassifier(random_state=42)
+
+PCmodel.fit(X_train,y_train)
