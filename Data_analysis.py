@@ -224,31 +224,61 @@ if 'u_newsCatInterestsST' in df_feeds.columns and 'u_newsCatInterests' in df_fee
 else:
     print("There's an Error, GG")
 
-
-#%% Task 2 Identifying Potential Customers 
+#Machine Learning Part 
+import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from scipy.stats import chi2_contingency
-from sklearn.preprocessing import LabelEncoder
-from sklearn.ensemble import RandomForestClassifier 
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, roc_auc_score
 
-categorical_columns=['gender', 'residence', 'city', 'city_rank', 'series_dev', 
-                       'series_group', 'emui_dev', 'device_name', 'device_size', 
-                       'net_type', 'task_id', 'adv_id', 'creat_type_cd', 
-                       'adv_prim_id', 'inter_type_cd', 'slot_id', 'site_id', 
-                       'spread_app_id', 'hispace_app_tags', 'app_second_class']
+# Load the data
+df_ads = pd.read_csv('train_data_ads.csv')
+df_feeds = pd.read_csv('train_data_feeds.csv')
 
-for col in categorical_columns:
-    le=LabelEncoder()
-    df_ads[col]=le.fit_transform(df_ads[col])
+# Identify potential customers
+potential_customers = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
 
-X = df_ads.drop(columns=['name of the thing'])
-y = df_ads['name of the thing']
+# Filter dataframes to only include potential customers
+ads_df = df_ads[df_ads['user_id'].isin(potential_customers)]
+feeds_df = df_feeds[df_feeds['u_userId'].isin(potential_customers)]
 
-# Perform stratified splitting
-X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.4, stratify=y, random_state=42)
-X_val, X_holdout, y_val, y_holdout = train_test_split(X_temp, y_temp, test_size=0.5, stratify=y_temp, random_state=42)
+# Merge the dataframes on user_id
+merged_df = pd.merge(ads_df, feeds_df, left_on='user_id', right_on='u_userId')
 
-PCmodel = RandomForestClassifier(random_state=42)
+# Feature Engineering
+# Select a subset of features and target variable
+features = ['age', 'gender', 'city', 'device_size', 'u_newsCatInterestsST', 'u_newsCatInterests']
+target = 'label'
 
-PCmodel.fit(X_train,y_train)
+# Drop rows with missing values in features and target
+merged_df = merged_df[features + [target]].dropna()
+
+# Separate features and target variable
+X = merged_df[features]
+y = merged_df[target]
+
+# Encode categorical variables
+X = pd.get_dummies(X, columns=['gender', 'city'])
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Standardize the data (if needed)
+scaler = StandardScaler()
+
+# Standardize numerical features
+numerical_features = ['age', 'device_size', 'u_newsCatInterestsST', 'u_newsCatInterests']
+X_train[numerical_features] = scaler.fit_transform(X_train[numerical_features])
+X_test[numerical_features] = scaler.transform(X_test[numerical_features])
+
+# Train a Random Forest Classifier
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = model.predict(X_test)
+y_proba = model.predict_proba(X_test)[:, 1]
+
+# Evaluate the model
+print(classification_report(y_test, y_pred))
+print(f"ROC-AUC Score: {roc_auc_score(y_test, y_proba)}")
