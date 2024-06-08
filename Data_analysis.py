@@ -28,8 +28,8 @@ def load_and_optimize_csv(file_path, chunk_size=1000):
     return df
 
 # Load and optimize datasets
-df_feeds = load_and_optimize_csv('train_data_feeds.csv')
-df_ads = load_and_optimize_csv('train_data_ads.csv')
+df_feeds = load_and_optimize_csv('train/train_data_feeds.csv')
+df_ads = load_and_optimize_csv('train/train_data_ads.csv')
 
 # Print shapes
 print(f"Final DataFrame Of The Publisher Dataset shape: {df_feeds.shape}")
@@ -231,9 +231,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, roc_auc_score
 
-# Load the data
-df_ads = pd.read_csv('train_data_ads.csv')
-df_feeds = pd.read_csv('train_data_feeds.csv')
 
 # Identify potential customers
 potential_customers = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
