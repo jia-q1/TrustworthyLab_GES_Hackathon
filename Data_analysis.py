@@ -3,10 +3,10 @@
 import pandas as pd
 
 #Publisher Dataset 
-df_feeds = pd.read_csv('summer_hackathon/train/train_data_feeds.csv').dropna() #no harm in dropping na's 
+df_feeds = pd.read_csv('/home/raidertesthackathon/summer_hackathon/train/train_data_feeds.csv').dropna() #no harm in dropping na's 
 
 #Advertisers Dataset 
-df_ads = pd.read_csv('summer_hackathon/train/train_data_ads.csv').dropna()
+df_ads = pd.read_csv('/home/raidertesthackathon/summer_hackathon/train/train_data_ads.csv').dropna()
 
 
 # Function to optimize data types
