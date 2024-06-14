@@ -5,6 +5,9 @@ df_feeds = pd.read_csv('train_data_feeds.csv').dropna() #no harm in dropping na'
 #Advertisers Dataset 
 df_ads = pd.read_csv('train_data_ads.csv').dropna()
 
+print(df_ads.head())
+print(df_feeds.head())
+
 # Print shapes
 print(f"Final DataFrame Of The Publisher Dataset shape: {df_feeds.shape}")
 print(f"Final DataFrame Of The Advertiser Dataset shape: {df_ads.shape}")
