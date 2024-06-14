@@ -29,7 +29,8 @@ df_feeds = load_and_optimize_csv(feeds_file_path)
 #Advertiser Dataset
 df_ads = load_and_optimize_csv(ads_file_path)
 
-
+print(df_ads.columns)
+print(df_feeds.columns)
 # Print shapes
 print(f"Final DataFrame Of The Publisher Dataset shape: {df_feeds.shape}")
 print(f"Final DataFrame Of The Advertiser Dataset shape: {df_ads.shape}")
