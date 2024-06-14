@@ -1,23 +1,6 @@
 import pandas as pd
 
-# Function to optimize data types
-def optimize_types(df):
-    for col in df.select_dtypes(include=['int64', 'float64']).columns:
-        if pd.api.types.is_integer_dtype(df[col]):
-            df[col] = pd.to_numeric(df[col], downcast='signed')  # downcast to int32
-        else:
-            df[col] = pd.to_numeric(df[col], downcast='float')  # downcast to float32
-    return df
 
-# Optimizing and loading dataset in chunks
-def load_and_optimize_csv(file_path, chunk_size=1000):
-    chunks = []
-    for chunk in pd.read_csv(file_path, chunksize=chunk_size):
-        chunk = chunk.dropna()  # Drop NA in chunks
-        chunk = optimize_types(chunk)
-        chunks.append(chunk)
-    df = pd.concat(chunks, ignore_index=True)
-    return df
 
 # Load and optimize datasets
 feeds_file_path = r'/home/raidertesthackathon/summer_hackathon/train/train_data_feeds.csv'
@@ -25,9 +8,9 @@ ads_file_path = r'/home/raidertesthackathon/summer_hackathon/train/train_data_ad
 
 # Load and optimize datasets
 #Publisher Dataset
-df_feeds = load_and_optimize_csv(feeds_file_path)
+df_feeds = pd.read_csv( '/home/raidertesthackathon/summer_hackathon/train/train_data_feeds.csv').dropna()
 #Advertiser Dataset
-df_ads = load_and_optimize_csv(ads_file_path)
+df_ads = pd.read_csv('/home/raidertesthackathon/summer_hackathon/train/train_data_ads.csv')
 
 print(df_ads.columns)
 print(df_feeds.columns)
