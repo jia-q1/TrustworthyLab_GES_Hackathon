@@ -221,13 +221,12 @@ if 'u_newsCatInterestsST' in df_feeds.columns and 'u_newsCatInterests' in df_fee
 else:
     print("There's an Error, GG")
 
+#Running PCA Test
+import numpy as np
+from sklearn.decomposition import PCA
+from scipy import stats
 
-#%% Task 2 Identifying Potential Customers 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, roc_auc_score
-
+# Identify potential customers
 potential_customers = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
 
 # Filter dataframes to only include potential customers
@@ -239,53 +238,55 @@ feeds_df['u_userId'] = feeds_df['u_userId'].astype('int64')
 # Merge the dataframes on user_id
 merged_df = pd.merge(ads_df, feeds_df, left_on='user_id', right_on='u_userId')
 
-# Feature Engineering
-# Select a subset of features and target variable
-features = ['age', 'gender', 'city', 'device_size', 'u_newsCatInterestsST', 'u_newsCatInterests']
-target = 'label'
+X = merged_df[['age', 'gender', 'city', 'device_size', 'u_newsCatInterestsST', 'u_newsCatInterests']]
 
-# Drop rows with missing values in features and target
-merged_df = merged_df[features + [target]].dropna()
+# Standardize the features (z-score)
+zscoredData = stats.zscore(X)
 
-# Ensure correct data types
-for col in features:
-    if merged_df[col].dtype == 'object':
-        print(f"Column {col} is of type object, which is unexpected.")
+# Fit PCA
+pca = PCA()
+pca.fit(zscoredData)
 
-# Convert numerical features explicitly
-numerical_features = ['age', 'device_size', 'u_newsCatInterestsST', 'u_newsCatInterests']
-for col in numerical_features:
-    merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
+#Loadings
+loadings = pca.components_*-1
 
-# Check for any remaining NaNs
-print(merged_df[numerical_features].isna().sum())
+# Proportion of variance explained by each component
+eigVals = pca.explained_variance_
 
-# Drop any rows that have NaNs after conversion
-merged_df = merged_df.dropna()
+    
+kaiserThreshold = 1
+print('Number of factors selected by Kaiser criterion:', np.count_nonzero(eigVals > kaiserThreshold))
 
-# Separate features and target variable
-X = merged_df[features]
-y = merged_df[target]
+print('Number of factors selected by elbow criterion: 1') 
 
-# Encode categorical variables
-X = pd.get_dummies(X, columns=['gender', 'city'])
+plt.figure(figsize=(10, 6))
+plt.plot(range(1, len(pca.explained_variance_) + 1), pca.explained_variance_, marker='o', linestyle='-')
+plt.axhline(y=1, color='r', linestyle='--', label='Kaiser Criterion (Eigenvalue=1)')
+plt.title('Principal Component vs Eigenvalue with Kaiser Criterion')
+plt.xlabel('Principal Component')
+plt.ylabel('Eigenvalue')
+plt.xticks(range(1, len(pca.explained_variance_) + 1))
+plt.legend()
+plt.grid(True)
+plt.show()
 
-# Split data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+n_components = len(pca.explained_variance_ratio_)
 
-# Standardize numerical features
-scaler = StandardScaler()
-X_train[numerical_features] = scaler.fit_transform(X_train[numerical_features])
-X_test[numerical_features] = scaler.transform(X_test[numerical_features])
-
-# Train a Logistic Regression model
-model = LogisticRegression(max_iter=1000, random_state=42)
-model.fit(X_train, y_train)
-
-# Make predictions
-y_pred = model.predict(X_test)
-y_proba = model.predict_proba(X_test)[:, 1]
-
-# Evaluate the model
-print(classification_report(y_test, y_pred))
-print(f"ROC-AUC Score: {roc_auc_score(y_test, y_proba)}")
+for whichPrincipalComponent in range(0, 3):  # Loop through three principal components index at 0 for 
+    plt.figure()
+    x = np.linspace(1, n_components, n_components)
+    plt.bar(x, loadings[whichPrincipalComponent, :] * -1)
+    plt.xlabel('Feature Index')
+    plt.ylabel('Loading')
+    plt.title(f'Principal Component {whichPrincipalComponent} Loadings')
+    for i, val in enumerate(loadings[whichPrincipalComponent, :]):
+        print(f'Feature Index: {i+1}, Loading: {val:.3f}')
+    plt.show()
+    
+varExplained = eigVals/sum(eigVals)*100
+print("\nCumulative proportion of variance explained by components:")
+for ii in range(len(varExplained)):
+    print(varExplained[ii].round(3))
+    
+cumulative_variance = varExplained[0] + varExplained[1] + varExplained[2]
+print("Cumulative variance explained by the first three principal components:", cumulative_variance)
