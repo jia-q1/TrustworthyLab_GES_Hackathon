@@ -228,12 +228,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, roc_auc_score
 
-print("Data types of ads_df:")
-print(df_ads.dtypes)
-print("\nData types of feeds_df:")
-print(df_feeds.dtypes)
-
-# Identify potential customers
 potential_customers = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
 
 # Filter dataframes to only include potential customers
@@ -244,7 +238,6 @@ feeds_df['u_userId'] = feeds_df['u_userId'].astype('int64')
 
 # Merge the dataframes on user_id
 merged_df = pd.merge(ads_df, feeds_df, left_on='user_id', right_on='u_userId')
-
 
 # Feature Engineering
 # Select a subset of features and target variable
@@ -285,8 +278,8 @@ scaler = StandardScaler()
 X_train[numerical_features] = scaler.fit_transform(X_train[numerical_features])
 X_test[numerical_features] = scaler.transform(X_test[numerical_features])
 
-# Train a Random Forest Classifier
-model = RandomForestClassifier(n_estimators=100, random_state=42)
+# Train a Logistic Regression model
+model = LogisticRegression(max_iter=1000, random_state=42)
 model.fit(X_train, y_train)
 
 # Make predictions
