@@ -19,8 +19,8 @@ def load_and_optimize_csv(file_path, chunk_size=1000):
     return df
 
 # Load and optimize datasets
-feeds_file_path = r'C:\Users\jiaqi\Downloads\train_data_feeds.csv'
-ads_file_path = r'C:\Users\jiaqi\Downloads\train_data_ads.csv'
+feeds_file_path = 'train_data_feeds.csv'
+ads_file_path = 'train_data_ads.csv'
 
 # Load and optimize datasets
 #Publisher Dataset
