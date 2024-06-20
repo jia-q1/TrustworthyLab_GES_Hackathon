@@ -51,7 +51,14 @@ if __name__ == "__main__":
     # Upload the data file
     upload_file(sftp, local_data_file, remote_data_file)
 
-    # Execute the Python script
+    # Decrypt data
+    stdout, stderr = execute_command(ssh, f'python3 /home/DatacraftHacker/summer_hackathon/decrypt.py')
+    if stderr:
+        print(f"Error: {stderr.decode('utf-8')}")
+    else:
+        print(f"Output: {stdout.decode('utf-8')}")
+
+    # Execute the analysis script
     stdout, stderr = execute_command(ssh, f'python3 {remote_python_script}')
     if stderr:
         print(f"Error: {stderr.decode('utf-8')}")
