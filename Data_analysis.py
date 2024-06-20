@@ -223,53 +223,6 @@ if 'u_newsCatInterestsST' in df_feeds.columns and 'u_newsCatInterests' in df_fee
 else:
     print("There's an Error, GG")
 
-#%%PCA
-import numpy as np
-from sklearn.decomposition import PCA
-from scipy import stats
-
-# Identify potential customers
-potential_customers = set(df_ads['user_id']).intersection(set(df_feeds['u_userId']))
-
-# Filter dataframes to only include potential customers
-ads_df = df_ads[df_ads['user_id'].isin(potential_customers)]
-feeds_df = df_feeds[df_feeds['u_userId'].isin(potential_customers)]
-
-feeds_df['u_userId'] = feeds_df['u_userId'].astype('int64')
-
-# Merge the dataframes on user_id
-merged_df = pd.merge(ads_df, feeds_df, left_on='user_id', right_on='u_userId')
-
-X = merged_df[['age', 'gender', 'city', 'device_size', 'u_newsCatInterestsST', 'u_newsCatInterests']]
-
-# Standardize the features (z-score)
-zscoredData = stats.zscore(X)
-
-# Fit PCA
-pca = PCA()
-pca.fit(zscoredData)
-
-#Loadings
-loadings = pca.components_*-1
-
-# Proportion of variance explained by each component
-eigVals = pca.explained_variance_
-
-    
-kaiserThreshold = 1
-print('Number of factors selected by Kaiser criterion:', np.count_nonzero(eigVals > kaiserThreshold))
-
-n_components = len(pca.explained_variance_ratio_)
-
-    
-varExplained = eigVals/sum(eigVals)*100
-print("\nCumulative proportion of variance explained by components:")
-for ii in range(len(varExplained)):
-    print(varExplained[ii].round(3))
-    
-cumulative_variance = varExplained[0] + varExplained[1] + varExplained[2]
-print("Cumulative variance explained by the first three principal components:", cumulative_variance)
-
 
 #%% Part two
 import pandas as pd
@@ -314,39 +267,79 @@ advertiser_only = df_feeds[~df_feeds['u_userId'].isin(merged_df['user_id'])].cop
 publisher_only['target'] = 0 
 advertiser_only['target'] = 0 
 
+
 # Apply split_and_expand function to both columns POSSIBLE PROBLEM HERE 
 u_newsCatInterestsST_y_expanded = split_and_expand(merged_df, 'u_newsCatInterestsST_y')
 u_newsCatInterests_expanded = split_and_expand(merged_df, 'u_newsCatInterests')
+
+
 
 merged_df = pd.concat([merged_df, u_newsCatInterestsST_y_expanded, u_newsCatInterests_expanded], axis=1)
 
 # Drop original columns POSSIBLE PROBLEM HERE 
 merged_df = merged_df.drop(columns=['u_newsCatInterestsST_y', 'u_newsCatInterests'])
 
+#HERE
+necessary_columns = ['age', 'city', 'device_size', 'u_newsCatInterestsST_y_1', 'u_newsCatInterestsST_y_2', 
+                     'u_newsCatInterestsST_y_3', 'u_newsCatInterestsST_y_4', 'u_newsCatInterestsST_y_5',
+                     'u_newsCatInterests_1', 'u_newsCatInterests_2', 'u_newsCatInterests_3', 
+                     'u_newsCatInterests_4', 'u_newsCatInterests_5']
+
+for col in necessary_columns:
+    if col not in publisher_only.columns:
+        publisher_only[col] = pd.NA
+    if col not in advertiser_only.columns:
+        advertiser_only[col] = pd.NA
+
+# Debug: Print columns to verify they were added correctly
+print("Publisher only columns before filling NaN values:", publisher_only.columns)
+print("Advertiser only columns before filling NaN values:", advertiser_only.columns)
+
+# Fill missing values
+for col in necessary_columns:
+    if publisher_only[col].dtype == 'object':
+        publisher_only[col] = publisher_only[col].fillna('unknown')
+    else:
+        publisher_only[col] = publisher_only[col].fillna(-1)
+    
+    if advertiser_only[col].dtype == 'object':
+        advertiser_only[col] = advertiser_only[col].fillna('unknown')
+    else:
+        advertiser_only[col] = advertiser_only[col].fillna(-1)
+
+
+#TO HERE
 # Combine merged_df with publisher_only and advertiser_only
 final = pd.concat([merged_df, publisher_only, advertiser_only], ignore_index=True)
 
-selected_columns = ['age', 'city', 'device_size', 'u_newsCatInterestsST_y_1', 'u_newsCatInterestsST_y_2', 'u_newsCatInterestsST_y_3', 'u_newsCatInterestsST_y_4','u_newsCatInterestsST_y_5','u_newsCatInterests_1','u_newsCatInterests_2','u_newsCatInterests_3','u_newsCatInterests_4','u_newsCatInterests_5', 'target']
-#merged_df = merged_df[selected_columns]
+# Debugging: Verify the presence of target values
+print(final['target'].value_counts())
 
-final=final[selected_columns].dropna()
+final = final.dropna(subset=necessary_columns)
 
-print(final.shape)
+# Select specified columns including target column
+selected_columns_with_target = necessary_columns + ['target']
+
+final = final[selected_columns_with_target]
+
+
 print("Columns in merged_df:")
 print(final.columns)
+print(final['target'].value_counts())
+
 
 # Create X 
-X = final.copy()
-
-# Ensure all columns are of type float or int
-#for col in selected_columns:
-   # if X[col].dtype == 'object':
-        #X[col] = X[col].astype('category').cat.codes
-   # else:
-       # X[col] = X[col].astype(float)
+X = final.drop(columns=['target'])
 
 # Convert target to int
 y = final['target'].astype(int)
+
+# Convert categorical columns to numerical codes
+for col in X.columns:
+    if X[col].dtype == 'object':
+        X[col] = X[col].astype('category').cat.codes
+    else:
+        X[col] = X[col].astype(float)
 
 #Split
 
@@ -354,8 +347,8 @@ X_train,X_test,y_train,y_test=train_test_split(X,y, test_size=0.2,random_state=4
 
 
 # Handling imbalanced data (not sure if this is needed)
-#sm = SMOTE(random_state=42)
-#X_train, y_train = sm.fit_resample(X_train, y_train)
+sm = SMOTE(random_state=42)
+X_train, y_train = sm.fit_resample(X_train, y_train)
 
 scaler=StandardScaler()
 X_train=scaler.fit_transform(X_train)
@@ -367,7 +360,15 @@ model.fit(X_train,y_train)
 
 #Predictions
 y_pred=model.predict(X_test)
-y_pred_prob=model.predict_proba(X_test)[:,1]
+y_pred_prob=model.predict_proba(X_test)
+
+# Ensure y_pred_prob has 2 columns
+if y_pred_prob.ndim == 2 and y_pred_prob.shape[1] == 2:
+    y_pred_prob = y_pred_prob[:, 1]
+elif y_pred_prob.ndim == 1:
+    print("Warning: y_pred_prob is 1D, assuming these are probabilities for the positive class.")
+else:
+    raise ValueError(f"Unexpected shape for y_pred_prob: {y_pred_prob.shape}")
 
 #Evaluate
 accuracy=accuracy_score(y_test,y_pred)
@@ -375,3 +376,5 @@ roc_auc=roc_auc_score(y_test,y_pred_prob)
 
 print("Accuracy", accuracy)
 print("ROC-AUC ", roc_auc)
+
+
