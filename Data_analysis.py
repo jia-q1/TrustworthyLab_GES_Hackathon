@@ -377,4 +377,152 @@ roc_auc=roc_auc_score(y_test,y_pred_prob)
 print("Accuracy", accuracy)
 print("ROC-AUC ", roc_auc)
 
+#%% Part 3 PCA
+from sklearn.metrics import roc_auc_score
+from sklearn.decomposition import PCA
+from scipy import stats
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+import matplotlib.pyplot as plt
+
+
+
+def split_and_expand(df, column_name):
+    # Split each cell value based on '^' 
+    categories = df[column_name].str.split('^')
+    
+    # Determine the maximum number of categories
+    max_categories = categories.apply(len).max()
+    
+    # Expand categories into separate columns and ensure all have max_categories columns
+    expanded_categories = categories.apply(lambda x: pd.Series(x + [pd.NA] * (max_categories - len(x))))
+    
+    # Rename columns to indicate they are from the original column
+    expanded_categories.columns = [f"{column_name}_{i+1}" for i in range(max_categories)]
+    
+    return expanded_categories
+
+df_feeds = load_and_optimize_csv(feeds_file_path)
+df_ads = load_and_optimize_csv(ads_file_path)
+
+df_ads['user_id'] = df_ads['user_id'].astype('int64')
+df_feeds['u_userId'] = df_feeds['u_userId'].astype('int64')
+
+df_ads = df_ads.drop_duplicates(subset=['user_id'])
+df_feeds = df_feeds.drop_duplicates(subset=['u_userId'])
+
+merged_df = pd.merge(df_ads, df_feeds, left_on='user_id', right_on='u_userId', how='inner')
+merged_df=merged_df.drop(columns=['u_userId'])
+merged_df['target'] = 1
+
+# Non-potential customers
+publisher_only = df_ads[~df_ads['user_id'].isin(merged_df['user_id'])].copy()
+advertiser_only = df_feeds[~df_feeds['u_userId'].isin(merged_df['user_id'])].copy()
+
+publisher_only['target'] = 0 
+advertiser_only['target'] = 0 
+
+
+# Apply split_and_expand function to both columns POSSIBLE PROBLEM HERE 
+u_newsCatInterestsST_y_expanded = split_and_expand(merged_df, 'u_newsCatInterestsST_y')
+u_newsCatInterests_expanded = split_and_expand(merged_df, 'u_newsCatInterests')
+
+
+
+merged_df = pd.concat([merged_df, u_newsCatInterestsST_y_expanded, u_newsCatInterests_expanded], axis=1)
+
+# Drop original columns POSSIBLE PROBLEM HERE 
+merged_df = merged_df.drop(columns=['u_newsCatInterestsST_y', 'u_newsCatInterests'])
+
+#HERE
+necessary_columns = ['age', 'city', 'device_size', 'u_newsCatInterestsST_y_1', 'u_newsCatInterestsST_y_2', 
+                     'u_newsCatInterestsST_y_3', 'u_newsCatInterestsST_y_4', 'u_newsCatInterestsST_y_5',
+                     'u_newsCatInterests_1', 'u_newsCatInterests_2', 'u_newsCatInterests_3', 
+                     'u_newsCatInterests_4', 'u_newsCatInterests_5']
+#COME BACK TO THIS
+for col in necessary_columns:
+    if col not in publisher_only.columns:
+        publisher_only[col] = pd.NA
+    if col not in advertiser_only.columns:
+        advertiser_only[col] = pd.NA
+
+# Fill missing values in publisher_only and advertiser_only
+for col in necessary_columns:
+    publisher_only[col] = publisher_only[col].fillna('unknown' if publisher_only[col].dtype == 'object' else -1)
+    advertiser_only[col] = advertiser_only[col].fillna('unknown' if advertiser_only[col].dtype == 'object' else -1)
+
+
+#TO HERE
+# Combine merged_df with publisher_only and advertiser_only
+final = pd.concat([merged_df, publisher_only, advertiser_only], ignore_index=True)
+
+# Debugging: Verify the presence of target values
+print(final['target'].value_counts())
+
+final = final.dropna(subset=necessary_columns)
+
+label_encoders = {}
+for col in necessary_columns:
+    if final[col].dtype == 'object':
+        le = LabelEncoder()
+        final[col] = le.fit_transform(final[col].astype(str))
+        label_encoders[col] = le
+
+# Ensure we have only numeric data
+numeric_final = final.select_dtypes(include=[np.number])
+
+# Add target back for PCA
+numeric_final['target'] = final['target']
+
+# Select specified columns including target column
+selected_columns_with_target = necessary_columns + ['target']
+numeric_final = numeric_final[selected_columns_with_target]
+
+# Calculate z-scores
+zscoredData = stats.zscore(numeric_final)
+
+# Fit PCA
+pca = PCA()
+pca.fit(zscoredData)
+
+#Loadings
+loadings = pca.components_*-1
+
+# Proportion of variance explained by each component
+eigVals = pca.explained_variance_
+
+    
+kaiserThreshold = 1
+print('Number of factors selected by Kaiser criterion:', np.count_nonzero(eigVals > kaiserThreshold))
+
+print('Number of factors selected by elbow criterion: 1') 
+
+plt.figure(figsize=(10, 6))
+plt.plot(range(1, len(pca.explained_variance_) + 1), pca.explained_variance_, marker='o', linestyle='-')
+plt.axhline(y=1, color='r', linestyle='--', label='Kaiser Criterion (Eigenvalue=1)')
+plt.title('Principal Component vs Eigenvalue with Kaiser Criterion')
+plt.xlabel('Principal Component')
+plt.ylabel('Eigenvalue')
+plt.xticks(range(1, len(pca.explained_variance_) + 1))
+plt.legend()
+plt.grid(True)
+plt.show()
+
+n_components = len(pca.explained_variance_ratio_)
+
+for whichPrincipalComponent in range(0,1):  # Loop through three principal components index at 0 for 
+    plt.figure()
+    x = np.linspace(1, n_components, n_components)
+    plt.bar(x, loadings[whichPrincipalComponent, :] * -1)
+    plt.xlabel('Feature Index')
+    plt.ylabel('Loading')
+    plt.title(f'Principal Component {whichPrincipalComponent} Loadings')
+    for i, val in enumerate(loadings[whichPrincipalComponent, :]):
+        print(f'Feature Index: {i+1}, Loading: {val:.3f}')
+    plt.show()
+    
+varExplained = eigVals/sum(eigVals)*100
+print("\nCumulative proportion of variance explained by components:")
+for ii in range(len(varExplained)):
+    print(varExplained[ii].round(3))
 
