@@ -20,8 +20,8 @@ def load_and_optimize_csv(file_path, chunk_size=1000):
     return df
 
 # Load and optimize datasets
-feeds_file_path = r'/home/raidertesthackathon/summer_hackathon/train/train_data_feeds.csv'
-ads_file_path = r'/home/raidertesthackathon/summer_hackathon/train/train_data_ads.csv'
+feeds_file_path = r'/home/datacrafthackathonkey/summer_hackathon/train/train_data_feeds.csv'
+ads_file_path = r'/home/datacrafthackathonkey/summer_hackathon/train/train_data_ads.csv'
 
 # Load and optimize datasets
 #Publisher Dataset
@@ -288,9 +288,15 @@ for col in necessary_columns:
 
 # Fill missing values in publisher_only and advertiser_only
 for col in necessary_columns:
-    publisher_only[col] = publisher_only[col].fillna('unknown' if publisher_only[col].dtype == 'object' else -1)
-    advertiser_only[col] = advertiser_only[col].fillna('unknown' if advertiser_only[col].dtype == 'object' else -1)
-
+    if publisher_only[col].dtype == 'object':
+        publisher_only[col] = publisher_only[col].fillna('unknown')
+    else:
+        publisher_only[col] = publisher_only[col].fillna(-1)
+    
+    if advertiser_only[col].dtype == 'object':
+        advertiser_only[col] = advertiser_only[col].fillna('unknown')
+    else:
+        advertiser_only[col] = advertiser_only[col].fillna(-1)
 
 # Combine merged_df with publisher_only and advertiser_only
 final = pd.concat([merged_df, publisher_only, advertiser_only], ignore_index=True)
@@ -337,7 +343,16 @@ X_train=scaler.fit_transform(X_train)
 X_test=scaler.transform(X_test)
 
 #Model
-model=RandomForestClassifier(n_estimators=100,random_state=42)
+model = RandomForestClassifier(
+    n_estimators=50,              # reduce number of estimators
+    random_state=42,
+    max_depth=5,                  # further limit depth of trees
+    min_samples_split=20,         # further increase minimum samples required to split
+    min_samples_leaf=10,          # further increase minimum samples required at a leaf node
+    max_features='sqrt',          # number of features to consider when looking for best split
+    bootstrap=True                # use bootstrap samples when building trees
+)
+
 model.fit(X_train,y_train)
 
 #Predictions
@@ -351,6 +366,8 @@ roc_auc=roc_auc_score(y_test,y_pred_prob)
 
 print("Accuracy", accuracy)
 print("ROC-AUC ", roc_auc)
+print("RMSE:", mean_squared_error(y_test, y_pred))
+
 #%%PCA 
 from sklearn.metrics import roc_auc_score
 from sklearn.decomposition import PCA
