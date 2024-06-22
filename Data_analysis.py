@@ -57,7 +57,7 @@ def plot_age_distribution(df_ads, df_feeds):
     plt.ylabel('Number of Users')
     plt.title('Distribution of Ages Among Users Who Click on Ads')
     plt.grid(True, linestyle='--', alpha=0.6)
-    plt.xticks(ages_counts.index)  # Ensure x-axis labels are aligned correctly
+    plt.xticks(ages_counts.index) 
     
     # Add text annotations
     for age, count in zip(ages_counts.index, ages_counts.values):
@@ -65,8 +65,7 @@ def plot_age_distribution(df_ads, df_feeds):
     
     plt.show()
 
-# Example usage
-# Assuming df_ads and df_feeds are your DataFrames
+
 plot_age_distribution(df_ads, df_feeds)
 
 #%%Geographic Distribution
@@ -80,8 +79,6 @@ def plot_city_distribution(df_ads, df_feeds):
     
     # Get the city distribution and sort by frequency
     cities_counts = ads_with_common_ids['city'].value_counts().sort_values(ascending=False)
-   
-    #Would city_rank be better? 
     
     # Top 10 since there are too many cities 
     top_n = 10
@@ -96,7 +93,6 @@ def plot_city_distribution(df_ads, df_feeds):
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.xticks(rotation=45, ha='right')  
     
-    # Add text annotations with city names and counts
     for bar, (city, count) in zip(bars, top_cities.items()):
         plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5, f"{city}\n({count})", ha='center', va='bottom', fontsize=8)
     
@@ -221,7 +217,7 @@ if 'u_newsCatInterestsST' in df_feeds.columns and 'u_newsCatInterests' in df_fee
     plt.tight_layout(pad=2.0)  
     plt.show()
 else:
-    print("There's an Error, GG")
+    print("There's an Error")
 
 
 #%% Part two
@@ -268,7 +264,7 @@ publisher_only['target'] = 0
 advertiser_only['target'] = 0 
 
 
-# Apply split_and_expand function to both columns POSSIBLE PROBLEM HERE 
+# Apply split_and_expand function to both columns
 u_newsCatInterestsST_y_expanded = split_and_expand(merged_df, 'u_newsCatInterestsST_y')
 u_newsCatInterests_expanded = split_and_expand(merged_df, 'u_newsCatInterests')
 
@@ -276,39 +272,26 @@ u_newsCatInterests_expanded = split_and_expand(merged_df, 'u_newsCatInterests')
 
 merged_df = pd.concat([merged_df, u_newsCatInterestsST_y_expanded, u_newsCatInterests_expanded], axis=1)
 
-# Drop original columns POSSIBLE PROBLEM HERE 
+# Drop original columns
 merged_df = merged_df.drop(columns=['u_newsCatInterestsST_y', 'u_newsCatInterests'])
 
-#HERE
+
 necessary_columns = ['age', 'city', 'device_size', 'u_newsCatInterestsST_y_1', 'u_newsCatInterestsST_y_2', 
                      'u_newsCatInterestsST_y_3', 'u_newsCatInterestsST_y_4', 'u_newsCatInterestsST_y_5',
                      'u_newsCatInterests_1', 'u_newsCatInterests_2', 'u_newsCatInterests_3', 
                      'u_newsCatInterests_4', 'u_newsCatInterests_5']
-
 for col in necessary_columns:
     if col not in publisher_only.columns:
         publisher_only[col] = pd.NA
     if col not in advertiser_only.columns:
         advertiser_only[col] = pd.NA
 
-# Debug: Print columns to verify they were added correctly
-print("Publisher only columns before filling NaN values:", publisher_only.columns)
-print("Advertiser only columns before filling NaN values:", advertiser_only.columns)
-
-# Fill missing values
+# Fill missing values in publisher_only and advertiser_only
 for col in necessary_columns:
-    if publisher_only[col].dtype == 'object':
-        publisher_only[col] = publisher_only[col].fillna('unknown')
-    else:
-        publisher_only[col] = publisher_only[col].fillna(-1)
-    
-    if advertiser_only[col].dtype == 'object':
-        advertiser_only[col] = advertiser_only[col].fillna('unknown')
-    else:
-        advertiser_only[col] = advertiser_only[col].fillna(-1)
+    publisher_only[col] = publisher_only[col].fillna('unknown' if publisher_only[col].dtype == 'object' else -1)
+    advertiser_only[col] = advertiser_only[col].fillna('unknown' if advertiser_only[col].dtype == 'object' else -1)
 
 
-#TO HERE
 # Combine merged_df with publisher_only and advertiser_only
 final = pd.concat([merged_df, publisher_only, advertiser_only], ignore_index=True)
 
@@ -328,7 +311,6 @@ print(final.columns)
 print(final['target'].value_counts())
 
 
-# Create X 
 X = final.drop(columns=['target'])
 
 # Convert target to int
@@ -346,7 +328,7 @@ for col in X.columns:
 X_train,X_test,y_train,y_test=train_test_split(X,y, test_size=0.2,random_state=42)
 
 
-# Handling imbalanced data (not sure if this is needed)
+# Handling imbalanced data 
 sm = SMOTE(random_state=42)
 X_train, y_train = sm.fit_resample(X_train, y_train)
 
@@ -360,15 +342,8 @@ model.fit(X_train,y_train)
 
 #Predictions
 y_pred=model.predict(X_test)
-y_pred_prob=model.predict_proba(X_test)
+y_pred_prob=model.predict_proba(X_test)[:,1]
 
-# Ensure y_pred_prob has 2 columns
-if y_pred_prob.ndim == 2 and y_pred_prob.shape[1] == 2:
-    y_pred_prob = y_pred_prob[:, 1]
-elif y_pred_prob.ndim == 1:
-    print("Warning: y_pred_prob is 1D, assuming these are probabilities for the positive class.")
-else:
-    raise ValueError(f"Unexpected shape for y_pred_prob: {y_pred_prob.shape}")
 
 #Evaluate
 accuracy=accuracy_score(y_test,y_pred)
@@ -376,15 +351,14 @@ roc_auc=roc_auc_score(y_test,y_pred_prob)
 
 print("Accuracy", accuracy)
 print("ROC-AUC ", roc_auc)
-
-#%% Part 3 PCA
+#%%PCA 
 from sklearn.metrics import roc_auc_score
 from sklearn.decomposition import PCA
 from scipy import stats
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
-
+from sklearn.metrics import classification_report, roc_auc_score
 
 
 def split_and_expand(df, column_name):
@@ -423,7 +397,7 @@ publisher_only['target'] = 0
 advertiser_only['target'] = 0 
 
 
-# Apply split_and_expand function to both columns POSSIBLE PROBLEM HERE 
+# Apply split_and_expand function to both columns
 u_newsCatInterestsST_y_expanded = split_and_expand(merged_df, 'u_newsCatInterestsST_y')
 u_newsCatInterests_expanded = split_and_expand(merged_df, 'u_newsCatInterests')
 
@@ -431,7 +405,7 @@ u_newsCatInterests_expanded = split_and_expand(merged_df, 'u_newsCatInterests')
 
 merged_df = pd.concat([merged_df, u_newsCatInterestsST_y_expanded, u_newsCatInterests_expanded], axis=1)
 
-# Drop original columns POSSIBLE PROBLEM HERE 
+# Drop original columns 
 merged_df = merged_df.drop(columns=['u_newsCatInterestsST_y', 'u_newsCatInterests'])
 
 #HERE
@@ -439,7 +413,6 @@ necessary_columns = ['age', 'city', 'device_size', 'u_newsCatInterestsST_y_1', '
                      'u_newsCatInterestsST_y_3', 'u_newsCatInterestsST_y_4', 'u_newsCatInterestsST_y_5',
                      'u_newsCatInterests_1', 'u_newsCatInterests_2', 'u_newsCatInterests_3', 
                      'u_newsCatInterests_4', 'u_newsCatInterests_5']
-#COME BACK TO THIS
 for col in necessary_columns:
     if col not in publisher_only.columns:
         publisher_only[col] = pd.NA
@@ -452,7 +425,6 @@ for col in necessary_columns:
     advertiser_only[col] = advertiser_only[col].fillna('unknown' if advertiser_only[col].dtype == 'object' else -1)
 
 
-#TO HERE
 # Combine merged_df with publisher_only and advertiser_only
 final = pd.concat([merged_df, publisher_only, advertiser_only], ignore_index=True)
 
@@ -525,4 +497,102 @@ varExplained = eigVals/sum(eigVals)*100
 print("\nCumulative proportion of variance explained by components:")
 for ii in range(len(varExplained)):
     print(varExplained[ii].round(3))
+#%% Probabilistic PCA 
+
+numeric_final = np.array(numeric_final, dtype=np.float64)
+d=numeric_final.shape[1]
+
+mu_ml=np.mean(numeric_final, axis=0)
+print("Data Average")
+print(mu_ml)
+
+data_cov=np.cov(numeric_final,rowvar=False)
+print("Data cov:")
+print(data_cov)
+
+#Parameters? 
+q=1
+#Variance
+lambdas,eigenvecs=np.linalg.eig(data_cov)
+idx=lambdas.argsort()[::-1]
+lambdas=lambdas[idx]
+eigenvecs= - eigenvecs[:,idx]
+print(eigenvecs)
+
+var_ml=(1.0/(d-q))*sum([lambdas[j] for j in range(q,d)])
+print("Var ML:")
+print(var_ml)
+
+#Weight matrix
+uq=eigenvecs[:,:q]
+print("uq:")
+print(uq)
+
+lambdaq=np.diag(lambdas[:q])
+print("Lambdaq")
+print(lambdaq)
+
+weight_ml=uq*np.sqrt(lambdaq-var_ml*np.eye(q))
+print("Weight matrix ML:")
+print(weight_ml)
+
+#Sampling hidden units?
+def sample_hidden_given_visible(weight_ml, mu_ml, var_ml, visible_samples):
+    q = weight_ml.shape[1]
+    m = np.transpose(weight_ml) @ weight_ml + var_ml * np.eye(q)
+    cov = var_ml * np.linalg.inv(m)
+    act_hidden = []
+    for data_visible in visible_samples:
+        mean = np.linalg.inv(m) @ np.transpose(weight_ml) @ (data_visible - mu_ml)
+        sample = np.random.multivariate_normal(mean, cov, size=1)
+        act_hidden.append(sample[0])
+    return np.array(act_hidden)
+
+visible_samples = np.array(numeric_final, dtype=np.float64)
+print(f"visible_samples: {visible_samples.dtype}")
+
+
+act_hidden=sample_hidden_given_visible(
+    weight_ml=weight_ml,
+    mu_ml=mu_ml,
+    var_ml=var_ml,
+    visible_samples=numeric_final
+    )
+
+#Sample new visible from those?
+
+
+def sample_visible_given_hidden(weight_ml, mu_ml, var_ml, hidden_samples):
+    d = weight_ml.shape[0]
+    act_visible = []
+    for data_hidden in hidden_samples:
+        mean = weight_ml @ data_hidden + mu_ml
+        cov = var_ml * np.eye(d)
+        sample = np.random.multivariate_normal(mean, cov, size=1)
+        act_visible.append(sample[0])
+    return np.array(act_visible)
+
+mean_hidden=np.full(q,0)
+cov_hidden=np.eye(q)
+
+no_samples=len(numeric_final)
+samples_hidden=np.random.multivariate_normal(mean_hidden,cov_hidden,size=no_samples)
+
+
+act_visible = sample_visible_given_hidden(
+    weight_ml=weight_ml,
+    mu_ml=mu_ml,
+    var_ml=var_ml,
+    hidden_samples=samples_hidden
+    )
+
+print("Covariance visibles (data):")
+print(data_cov)
+print("Covariance visibles (sampled):")
+print(np.cov(act_visible,rowvar=False))
+
+print("Mean visibles (data):")
+print(np.mean(numeric_final,axis=0))
+print("Mean visibles (sampled):")
+print(np.mean(act_visible,axis=0))
 
