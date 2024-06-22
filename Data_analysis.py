@@ -366,7 +366,6 @@ roc_auc=roc_auc_score(y_test,y_pred_prob)
 
 print("Accuracy", accuracy)
 print("ROC-AUC ", roc_auc)
-print("RMSE:", mean_squared_error(y_test, y_pred))
 
 #%%PCA 
 from sklearn.metrics import roc_auc_score
