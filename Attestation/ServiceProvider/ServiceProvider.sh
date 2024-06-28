@@ -13,12 +13,12 @@ device_registration_request=0
 device_service_request=0
 
 # Attestation Data
-GOLDEN_PCR_SELECTION="sha1:0,1,2+sha256:0,1,2"
-GOLDEN_PCR="b07225600a819709bfb4ffc4db74d8cae203a35a48564f5eda07e0d54a19471e"
+GOLDEN_PCR_SELECTION="sha1:16+sha256:16"
+GOLDEN_PCR="7914e70341bf6492284f991a2415ad88339acd27c7689c7bc5b1f6cca0726cc0"
 
 # Service Data
 #SERVICE_CONTENT="Hello world!"
-SERVICE_CONTENT=b'functionremainsunchangedasitwillcorrectly'
+SERVICE_CONTENT='functionremainsunchangedasitwillcorrectly'
 
 wait_loop() {
     counter=1
