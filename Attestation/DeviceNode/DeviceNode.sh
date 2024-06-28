@@ -252,6 +252,15 @@ process_device_anonymous_identity_challenge() {
    return 0
 }
 
+extend_code_hash_to_pcr() {
+    SHA256_DATA=`cat code.txt | openssl dgst -sha256 -binary | xxd -p -c 32`
+    SHA1_DATA=`cat code.txt | openssl dgst -sha1 -binary | xxd -p -c 20`
+
+    tpm2_pcrreset 16
+
+    tpm2_pcrextend 16:sha1=$SHA1_DATA,sha256=$SHA256_DATA
+}
+
 process_device_software_state_validation_request() {
 
     software_state_string="PCR selection list receipt from Service-Provider"
@@ -263,6 +272,7 @@ process_device_software_state_validation_request() {
     fi
     LOG_INFO "$software_state_string"
     event_file_found=0
+	extend_code_hash_to_pcr
     pcr_selection=`grep pcr-selection s_d_pcrlist.txt | \
     awk '{print $2}'`
     service_provider_nonce=`grep nonce s_d_pcrlist.txt | \
@@ -306,6 +316,8 @@ process_encrypted_service_data_content() {
     fi
     LOG_INFO "$service_data_status_string"
 
+	cp s_d_service_content.decrypted key.txt
+	chmod a+r key.txt
     SERVICE_CONTENT=`cat s_d_service_content.decrypted`
     LOG_INFO "Service-content: \e[5m$SERVICE_CONTENT"
     rm -f s_d_service_content.*
