@@ -222,27 +222,20 @@ else:
 
 #%% Part two
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix, classification_report
 from imblearn.over_sampling import SMOTE
 
 def split_and_expand(df, column_name):
-    # Split each cell value based on '^' 
     categories = df[column_name].str.split('^')
-    
-    # Determine the maximum number of categories
     max_categories = categories.apply(len).max()
-    
-    # Expand categories into separate columns and ensure all have max_categories columns
     expanded_categories = categories.apply(lambda x: pd.Series(x + [pd.NA] * (max_categories - len(x))))
-    
-    # Rename columns to indicate they are from the original column
     expanded_categories.columns = [f"{column_name}_{i+1}" for i in range(max_categories)]
-    
     return expanded_categories
 
+# Load datasets
 df_feeds = load_and_optimize_csv(feeds_file_path)
 df_ads = load_and_optimize_csv(ads_file_path)
 
@@ -253,40 +246,34 @@ df_ads = df_ads.drop_duplicates(subset=['user_id'])
 df_feeds = df_feeds.drop_duplicates(subset=['u_userId'])
 
 merged_df = pd.merge(df_ads, df_feeds, left_on='user_id', right_on='u_userId', how='inner')
-merged_df=merged_df.drop(columns=['u_userId'])
+merged_df = merged_df.drop(columns=['u_userId'])
 merged_df['target'] = 1
 
-# Non-potential customers
 publisher_only = df_ads[~df_ads['user_id'].isin(merged_df['user_id'])].copy()
 advertiser_only = df_feeds[~df_feeds['u_userId'].isin(merged_df['user_id'])].copy()
-
 publisher_only['target'] = 0 
 advertiser_only['target'] = 0 
 
-
-# Apply split_and_expand function to both columns
 u_newsCatInterestsST_y_expanded = split_and_expand(merged_df, 'u_newsCatInterestsST_y')
 u_newsCatInterests_expanded = split_and_expand(merged_df, 'u_newsCatInterests')
 
-
-
 merged_df = pd.concat([merged_df, u_newsCatInterestsST_y_expanded, u_newsCatInterests_expanded], axis=1)
-
-# Drop original columns
 merged_df = merged_df.drop(columns=['u_newsCatInterestsST_y', 'u_newsCatInterests'])
-
 
 necessary_columns = ['age', 'city', 'device_size', 'u_newsCatInterestsST_y_1', 'u_newsCatInterestsST_y_2', 
                      'u_newsCatInterestsST_y_3', 'u_newsCatInterestsST_y_4', 'u_newsCatInterestsST_y_5',
                      'u_newsCatInterests_1', 'u_newsCatInterests_2', 'u_newsCatInterests_3', 
                      'u_newsCatInterests_4', 'u_newsCatInterests_5']
+
 for col in necessary_columns:
     if col not in publisher_only.columns:
         publisher_only[col] = pd.NA
     if col not in advertiser_only.columns:
         advertiser_only[col] = pd.NA
 
-# Fill missing values in publisher_only and advertiser_only
+print("Publisher only columns before filling NaN values:", publisher_only.columns)
+print("Advertiser only columns before filling NaN values:", advertiser_only.columns)
+
 for col in necessary_columns:
     if publisher_only[col].dtype == 'object':
         publisher_only[col] = publisher_only[col].fillna('unknown')
@@ -298,76 +285,78 @@ for col in necessary_columns:
     else:
         advertiser_only[col] = advertiser_only[col].fillna(-1)
 
-# Combine merged_df with publisher_only and advertiser_only
 final = pd.concat([merged_df, publisher_only, advertiser_only], ignore_index=True)
 
-# Debugging: Verify the presence of target values
 print(final['target'].value_counts())
-
 final = final.dropna(subset=necessary_columns)
-
-# Select specified columns including target column
 selected_columns_with_target = necessary_columns + ['target']
-
 final = final[selected_columns_with_target]
-
 
 print("Columns in merged_df:")
 print(final.columns)
 print(final['target'].value_counts())
 
-
 X = final.drop(columns=['target'])
-
-# Convert target to int
 y = final['target'].astype(int)
 
-# Convert categorical columns to numerical codes
 for col in X.columns:
     if X[col].dtype == 'object':
         X[col] = X[col].astype('category').cat.codes
     else:
         X[col] = X[col].astype(float)
 
-#Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
-X_train,X_test,y_train,y_test=train_test_split(X,y, test_size=0.2,random_state=42)
-
-
-# Handling imbalanced data 
 sm = SMOTE(random_state=42)
 X_train, y_train = sm.fit_resample(X_train, y_train)
 
-scaler=StandardScaler()
-X_train=scaler.fit_transform(X_train)
-X_test=scaler.transform(X_test)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
 
-#Model
-model = RandomForestClassifier(
-    n_estimators=50,              # reduce number of estimators
-    random_state=42,
-    max_depth=5,                  # further limit depth of trees
-    min_samples_split=20,         # further increase minimum samples required to split
-    min_samples_leaf=10,          # further increase minimum samples required at a leaf node
-    max_features='sqrt',          # number of features to consider when looking for best split
-    bootstrap=True                # use bootstrap samples when building trees
-)
+# Initialize Logistic Regression
+model = LogisticRegression(max_iter=500, solver='lbfgs', random_state=42)
 
-model.fit(X_train,y_train)
+# Train the model
+model.fit(X_train, y_train)
 
-#Predictions
-y_pred=model.predict(X_test)
-y_pred_prob=model.predict_proba(X_test)[:,1]
+# Predictions
+y_pred = model.predict(X_test)
+y_pred_prob = model.predict_proba(X_test)[:, 1]
 
+# Evaluate
+accuracy = accuracy_score(y_test, y_pred)
+roc_auc = roc_auc_score(y_test, y_pred_prob)
 
-#Evaluate
-accuracy=accuracy_score(y_test,y_pred)
-roc_auc=roc_auc_score(y_test,y_pred_prob)
+print("Accuracy:", accuracy)
+print("ROC-AUC:", roc_auc)
 
-print("Accuracy", accuracy)
-print("ROC-AUC ", roc_auc)
+# Confusion Matrix
+conf_matrix = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:\n", conf_matrix)
 
-#%%PCA 
+# Classification Report
+class_report = classification_report(y_test, y_pred)
+print("Classification Report:\n", class_report)
+
+# Perform cross-validation for better evaluation
+cv_scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+print("Cross-validated accuracy:", cv_scores.mean())
+
+# Save results
+with open("Task2RunResults.txt", "w") as file:
+    file.write("Publisher only columns before filling NaN values: " + ','.join(publisher_only.columns) + '\n')
+    file.write("Advertiser only columns before filling NaN values: " + ','.join(advertiser_only.columns) + '\n')
+    file.write("Target value counts: \n" + final['target'].value_counts().to_string() + '\n')
+    file.write("Columns in merged_df: \n" + ','.join(final.columns) + '\n')
+    file.write("Target value counts: \n" + final['target'].value_counts().to_string() + '\n')
+    file.write("Accuracy: " + str(accuracy) + '\n')
+    file.write("ROC-AUC: " + str(roc_auc) + '\n')
+    file.write("Confusion Matrix:\n" + str(conf_matrix) + '\n')
+    file.write("Classification Report:\n" + class_report + '\n')
+    file.write("Cross-validated accuracy: " + str(cv_scores.mean()) + '\n')
+
+#%% Part III: PCA 
 from sklearn.metrics import roc_auc_score
 from sklearn.decomposition import PCA
 from scipy import stats
